@@ -1,144 +1,122 @@
 # CaseFlow
 
-CaseFlow is a Next.js + Prisma app for building and executing node-based workflows.
+CaseFlow is a technical prototype for graph-based AI workflow authoring. It combines a visual workspace for node execution with a reusable instruction library, allowing users to compose, branch, merge, and package prompt logic as structured graph operations instead of linear chat.
 
-## Local Development
+## Live Demo
 
-1. Install dependencies:
+Production deployment:
+
+- https://case-flow-ebon.vercel.app/
+
+## Prototype Goals
+
+- Explore node-and-edge authoring for LLM-assisted work
+- Support reusable prompt logic through a separate instruction library
+- Preserve branching behavior by executing against upstream incoming context rather than the entire graph
+- Test a lightweight full-stack architecture suitable for rapid iteration
+
+## Core Capabilities
+
+### Work Canvas
+
+- Create, move, edit, and delete nodes
+- Connect nodes with edges that bind either an instruction or an inline prompt
+- Execute a selected node to generate the next node through the OpenAI API
+- Merge multiple nodes into a new synthesized node
+- Combine a subgraph into a reusable custom instruction
+
+### Instruction Library
+
+- Maintain `QUICK` instructions as reusable prompt templates
+- Generate `CUSTOM` instructions from selected work subgraphs
+- Preview and edit custom instruction graphs in a mini canvas
+- Rebind instruction edges without executing inside the library view
+
+### Execution Model
+
+- Execution is explicit and single-step
+- Edges define structure and prompt/instruction bindings
+- Upstream context is collected through incoming graph traversal
+- Generated output is stored as editable node state
+
+## System Design
+
+### Frontend
+
+- Next.js App Router
+- React 19
+- React Flow for graph editing
+- Material UI for UI composition
+
+### Backend
+
+- Next.js route handlers for application APIs
+- Prisma ORM
+- OpenAI Responses API for node execution
+
+### Data Layer
+
+- PostgreSQL-compatible runtime configuration
+- Supabase-hosted Postgres for deployed environments
+- Prisma schema and project-local migration history
+
+## Development Workflow
 
 ```bash
 npm install
-```
-
-2. Create your local env file from the example:
-
-```bash
 cp .env.example .env
-```
-
-3. Run the app:
-
-```bash
 npm run dev
 ```
 
-## GitHub Safety
+Useful commands:
 
-Safe to commit:
-
-- `src/`
-- `prisma/schema.prisma`
-- `prisma/migrations/`
-- `.env.example`
-- `package.json`
-- `package-lock.json`
-
-Do not commit:
-
-- `.env`
-- real API keys
-- `prisma/dev.db`
-- `.next/`
-- `node_modules/`
-
-The app supports entering an OpenAI API key in the top toolbar. That key is stored in browser `localStorage` and sent to the server only when executing a node.
-
-This is useful for private personal use, but it is not a secure multi-user auth model. Anyone using the browser can inspect their own key.
-
-## Deployment
-
-This project is best deployed as one repository containing both frontend and backend code.
-
-Recommended platforms:
-
-- Vercel for the Next.js app
-- Neon, Supabase, or Railway Postgres for the database
-
-### Automatic CD
-
-Yes. Once your GitHub repository is connected to Vercel, pushes to `main` can trigger automatic production deployments.
-
-Typical flow:
-
-1. `git push` to GitHub
-2. GitHub Actions runs CI
-3. Vercel detects the new commit
-4. Vercel builds and deploys automatically
-
-You do not need to buy a separate CI/CD service for this setup.
-
-### Sharing With Friends
-
-You do not need to buy a domain just to let friends try the app.
-
-If you deploy on Vercel, it will give you a free URL like:
-
-```txt
-https://caseflow-your-project.vercel.app
+```bash
+npm run db:push
+npm run db:import-sqlite
+npm run build
 ```
 
-You can send that URL directly to friends.
+## Environment Configuration
 
-A custom domain is optional and only useful if you want a cleaner public address such as:
-
-```txt
-https://caseflow.app
-```
-
-### Recommended First Deployment Path
-
-1. Deploy to Vercel using the free `*.vercel.app` domain
-2. Share that URL with friends for testing
-3. Buy a custom domain later only if you want branding or a permanent public URL
-
-## Database Notes
-
-This project is now configured for PostgreSQL-compatible databases such as Supabase.
-
-Use two URLs:
+The project uses two database URLs:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
 DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres?sslmode=require"
 ```
 
-Recommended usage:
+- `DATABASE_URL` is used for runtime connections in deployed environments
+- `DIRECT_URL` is used for Prisma CLI operations and local development
 
-- `DATABASE_URL`: pooled runtime connection for Prisma Client and Vercel
-- `DIRECT_URL`: direct connection for Prisma CLI commands
+An optional `OPENAI_API_KEY` can be configured server-side. The prototype also supports entering an API key in the UI toolbar for private testing flows.
 
-The Prisma datasource is configured in `prisma/schema.prisma` with:
+## Deployment
 
-```prisma
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-```
+Recommended deployment stack:
 
-For a fresh empty Supabase database, the fastest first setup is:
+- Vercel for the application
+- Supabase for PostgreSQL
+- GitHub Actions for CI
 
-```bash
-npm run db:push
-```
+Current delivery model:
 
-This pushes the current Prisma schema into the remote Postgres database.
+- Pushes to `main` trigger GitHub CI
+- Vercel is configured for automatic deployment from GitHub
+- Supabase provides the shared hosted database for remote use
 
-Because the older checked-in migrations were created during SQLite development, do not use them as-is against a fresh Supabase database.
+## Current Limitations
 
-Update your local `.env` to use the same `DATABASE_URL` and `DIRECT_URL` values before running Prisma commands locally.
+This is an MVP / prototype and intentionally excludes:
 
-## Suggested Production Setup
+- automatic whole-graph execution
+- multi-input execution semantics
+- conditional routing
+- instruction versioning
+- collaborative multi-user auth
+- production-hardened secrets management for shared public usage
 
-1. Push this repo to GitHub
-2. Connect the repo to Vercel
-3. Create a cloud Postgres database
-4. Set `DATABASE_URL` and `DIRECT_URL` in Vercel
-5. Run `npm run db:push` once against the Supabase database
-6. Optionally set `OPENAI_API_KEY` on the server for private admin use
-7. Push to `main` and let Vercel auto-deploy
+## Notes
 
-## Important Security Note
-
-If your current OpenAI key has ever been committed, shared, or exposed outside your local machine, rotate it immediately before deploying or sharing the repo.
+- Local `.env` files and real API keys must not be committed
+- Legacy SQLite data can be imported into Postgres with `npm run db:import-sqlite`
+- The current repository includes prototype-era migration history and active schema iteration

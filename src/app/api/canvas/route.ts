@@ -12,6 +12,7 @@ const DEFAULT_QUICK: Array<{ title: string; template: string; description?: stri
 export async function GET() {
   try {
     let canvas = await prisma.canvas.findFirst({
+      orderBy: [{ nodes: { _count: "desc" } }, { createdAt: "asc" }],
       include: { instructions: { select: { id: true, kind: true, title: true, description: true } } },
     });
 
