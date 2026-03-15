@@ -54,6 +54,19 @@ Recommended platforms:
 - Vercel for the Next.js app
 - Neon, Supabase, or Railway Postgres for the database
 
+### Automatic CD
+
+Yes. Once your GitHub repository is connected to Vercel, pushes to `main` can trigger automatic production deployments.
+
+Typical flow:
+
+1. `git push` to GitHub
+2. GitHub Actions runs CI
+3. Vercel detects the new commit
+4. Vercel builds and deploys automatically
+
+You do not need to buy a separate CI/CD service for this setup.
+
 ### Sharing With Friends
 
 You do not need to buy a domain just to let friends try the app.
@@ -80,41 +93,51 @@ https://caseflow.app
 
 ## Database Notes
 
-Local development currently uses SQLite:
+This project is now configured for PostgreSQL-compatible databases such as Supabase.
+
+Use two URLs:
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/postgres?sslmode=require"
 ```
 
-For production, prefer cloud Postgres:
+Recommended usage:
 
-```env
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DB?sslmode=require"
-```
+- `DATABASE_URL`: pooled runtime connection for Prisma Client and Vercel
+- `DIRECT_URL`: direct connection for Prisma CLI commands
 
-If you move to Postgres, update `prisma/schema.prisma`:
+The Prisma datasource is configured in `prisma/schema.prisma` with:
 
 ```prisma
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 ```
 
-Then run:
+For a fresh empty Supabase database, the fastest first setup is:
 
 ```bash
-npx prisma migrate deploy
+npm run db:push
 ```
+
+This pushes the current Prisma schema into the remote Postgres database.
+
+Because the older checked-in migrations were created during SQLite development, do not use them as-is against a fresh Supabase database.
+
+Update your local `.env` to use the same `DATABASE_URL` and `DIRECT_URL` values before running Prisma commands locally.
 
 ## Suggested Production Setup
 
 1. Push this repo to GitHub
 2. Connect the repo to Vercel
 3. Create a cloud Postgres database
-4. Set `DATABASE_URL` in the deployment platform
-5. Optionally set `OPENAI_API_KEY` on the server for private admin use
-6. Run Prisma migrations during deployment
+4. Set `DATABASE_URL` and `DIRECT_URL` in Vercel
+5. Run `npm run db:push` once against the Supabase database
+6. Optionally set `OPENAI_API_KEY` on the server for private admin use
+7. Push to `main` and let Vercel auto-deploy
 
 ## Important Security Note
 
