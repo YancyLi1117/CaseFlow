@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Canvas {
+  id        String   @id @default(cuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // WORK graph
+  nodes Node[]
+  edges Edge[]
+
+  // LIB
+  instructions Instruction[]
+}
+
+//
+// =======================
+// WORK
+// =======================
+//
+
+model Node {
+  id       String @id @default(cuid())
+  canvasId String
+  canvas   Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  title   String @default("Node")
+  context String
+
+  x Float
+  y Float
+
+  activeRunId String?
+  runs        NodeRun[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canvasId])
+}
+
+model Edge {
+  id       String @id @default(cuid())
+  canvasId String
+  canvas   Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  sourceNodeId String
+  targetNodeId String
+
+  sourceHandle String?
+  targetHandle String?
+
+  // ✅ Mode A: Use Instruction (instructionId set, prompt null)
+  instructionId String?
+  instruction   Instruction? @relation("WorkEdgeInstruction", fields: [instructionId], references: [id], onDelete: SetNull)
+
+  // ✅ Mode B: Write Prompt (instructionId null, prompt set)
+  // Also used as "snapshot label" for execute edge if you want (optional)
+  prompt String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canvasId])
+  @@index([instructionId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+}
+
+model NodeRun {
+  id     String @id @default(cuid())
+  nodeId String
+  node   Node   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  // store: finalPrompt, instructionId (if any), prompt (if inline), etc.
+  input Json
+
+  output    String
+  model     String
+  createdAt DateTime @default(now())
+
+  @@index([nodeId])
+}
+
+//
+// =======================
+// LIB
+// =======================
+//
+
+model Instruction {
+  id       String @id @default(cuid())
+  canvasId String
+  canvas   Canvas @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  kind InstructionKind
+
+  title       String
+  description String?
+
+  // QUICK instruction: store one template (single text prompt)
+  // CUSTOM instruction: template usually null (logic lives in lib graph)
+  template String?
+
+  // referenced by WORK edges
+  workEdges Edge[] @relation("WorkEdgeInstruction")
+
+  // CUSTOM instruction graph (preview/edit in LIB)
+  nodesLib InstructionNode[]
+  edgesLib InstructionEdge[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canvasId])
+  @@index([kind])
+}
+
+model InstructionNode {
+  id            String      @id @default(cuid())
+  instructionId String
+  instruction   Instruction @relation(fields: [instructionId], references: [id], onDelete: Cascade)
+
+  context String
+
+  x Float
+  y Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([instructionId])
+}
+
+model InstructionEdge {
+  id            String      @id @default(cuid())
+  instructionId String
+  instruction   Instruction @relation(fields: [instructionId], references: [id], onDelete: Cascade)
+
+  sourceNodeId String
+  targetNodeId String
+
+  sourceHandle String?
+  targetHandle String?
+
+  // Optional binding inside CUSTOM instruction graph
+  edgeInstructionId String?
+  prompt            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([instructionId])
+  @@index([edgeInstructionId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+}
+
+enum InstructionKind {
+  QUICK
+  CUSTOM
+}
