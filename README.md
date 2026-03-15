@@ -54,6 +54,30 @@ Recommended platforms:
 - Vercel for the Next.js app
 - Neon, Supabase, or Railway Postgres for the database
 
+### Sharing With Friends
+
+You do not need to buy a domain just to let friends try the app.
+
+If you deploy on Vercel, it will give you a free URL like:
+
+```txt
+https://caseflow-your-project.vercel.app
+```
+
+You can send that URL directly to friends.
+
+A custom domain is optional and only useful if you want a cleaner public address such as:
+
+```txt
+https://caseflow.app
+```
+
+### Recommended First Deployment Path
+
+1. Deploy to Vercel using the free `*.vercel.app` domain
+2. Share that URL with friends for testing
+3. Buy a custom domain later only if you want branding or a permanent public URL
+
 ## Database Notes
 
 Local development currently uses SQLite:
