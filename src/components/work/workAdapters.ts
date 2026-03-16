@@ -3,7 +3,7 @@ import type { CaseNodeData } from "@/types/flow/node";
 import type { EdgeData } from "@/types/flow/edge";
 import type { ApiWorkNode, ApiWorkEdge } from "@/types/api/work";
 import type { ApiCanvas } from "@/types/api/canvas";
-import { short } from "@/lib/text";
+import { buildFlowEdge } from "@/lib/flowEdges";
 
 export function toRFNodes(nodes: ApiWorkNode[]): Array<Node<CaseNodeData, "caseNode">> {
   return nodes.map((n) => ({
@@ -17,26 +17,16 @@ export function toRFNodes(nodes: ApiWorkNode[]): Array<Node<CaseNodeData, "caseN
 export function toRFEdges(edges: ApiWorkEdge[], canvas: ApiCanvas | null): Array<Edge<EdgeData>> {
   const getTitle = (id: string) => canvas?.instructions.find((x) => x.id === id)?.title ?? "Instruction";
 
-  return edges.map((e) => {
-    const label =
-      e.prompt ? `⟶ ${short(e.prompt)}` : e.instructionId ? `⟶ ${getTitle(e.instructionId)}` : "";
-
-    return {
+  return edges.map((e) =>
+    buildFlowEdge({
       id: e.id,
       source: e.sourceNodeId,
       target: e.targetNodeId,
       sourceHandle: e.sourceHandle ?? "out",
       targetHandle: e.targetHandle ?? "in",
-      animated: true,
-      style: { strokeWidth: 2 },
-      label,
-      labelBgPadding: [6, 10],
-      labelBgBorderRadius: 999,
-      data: {
-        instructionId: e.instructionId ?? null,
-        prompt: e.prompt ?? undefined,
-        instructionTitle: e.instructionId ? getTitle(e.instructionId) : undefined,
-      },
-    };
-  });
+      instructionId: e.instructionId ?? null,
+      prompt: e.prompt ?? undefined,
+      instructionTitle: e.instructionId ? getTitle(e.instructionId) : undefined,
+    })
+  );
 }

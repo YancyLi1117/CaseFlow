@@ -7,14 +7,10 @@ import type { Node, Edge } from "reactflow";
 import type { ApiCanvas } from "@/types/api/canvas";
 import type { CaseNodeData } from "@/types/flow/node";
 import type { EdgeData } from "@/types/flow/edge";
+import type { WorkSelection } from "@/types/selection";
 
 import { WorkNodeInspector } from "@/components/inspector/WorkNodeInspector";
 import { WorkEdgeInspector } from "@/components/inspector/WorkEdgeInspector";
-
-export type WorkSelection =
-  | { kind: "NONE" }
-  | { kind: "NODE"; nodeId: string }
-  | { kind: "EDGE"; edgeId: string };
 
 export function InspectorPanel(props: {
   canvas: ApiCanvas | null;

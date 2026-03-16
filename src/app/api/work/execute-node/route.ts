@@ -9,6 +9,13 @@ type Body = {
   prompt?: string | null;
 };
 
+type MemoryNode = {
+  id: string;
+  context: string;
+  createdAt: Date;
+  depth: number;
+};
+
 function extractOutputText(resp: unknown): string {
   const r = resp as {
     output_text?: string;
@@ -22,6 +29,79 @@ function extractOutputText(resp: unknown): string {
       ?.map((c) => c.text ?? "") ?? [];
   const joined = chunks.join("").trim();
   return joined;
+}
+
+// Walk backwards through incoming edges so execution only sees the local branch
+// that feeds the selected node, rather than the entire canvas.
+async function collectIncomingMemory(input: {
+  nodeId: string;
+  canvasId: string;
+  incomingHops: number;
+}): Promise<MemoryNode[]> {
+  const memoryNodes: MemoryNode[] = [];
+  if (input.incomingHops <= 0) return memoryNodes;
+
+  const visited = new Set<string>([input.nodeId]);
+  let frontier = [input.nodeId];
+
+  for (let depth = 1; depth <= input.incomingHops; depth += 1) {
+    const edges = await prisma.edge.findMany({
+      where: { canvasId: input.canvasId, targetNodeId: { in: frontier } },
+      select: { sourceNodeId: true },
+    });
+    const sourceIds = Array.from(
+      new Set(edges.map((edge) => edge.sourceNodeId).filter((id) => id && !visited.has(id)))
+    ) as string[];
+
+    if (sourceIds.length === 0) break;
+
+    const sources = await prisma.node.findMany({
+      where: { id: { in: sourceIds } },
+      select: { id: true, context: true, createdAt: true },
+    });
+
+    for (const source of sources) {
+      visited.add(source.id);
+      memoryNodes.push({
+        id: source.id,
+        context: extractOutput(source.context),
+        createdAt: source.createdAt,
+        depth,
+      });
+    }
+
+    frontier = sourceIds;
+  }
+
+  return memoryNodes;
+}
+
+function buildExecutionPrompt(input: {
+  instructionText: string;
+  brevity: string;
+  currentContext: string;
+  memoryNodes: MemoryNode[];
+}) {
+  const orderedMemory = input.memoryNodes
+    .sort((a, b) => {
+      if (a.depth !== b.depth) return b.depth - a.depth;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    })
+    .map((node) => node.context)
+    .filter((context) => context.trim().length > 0)
+    .join("\n\n---\n\n");
+
+  const fullContext = orderedMemory
+    ? `Upstream Context:\n${orderedMemory}\n\nCurrent Context:\n${input.currentContext}`
+    : `Current Context:\n${input.currentContext}`;
+
+  return [
+    input.instructionText ? `Instruction:\n${input.instructionText}` : "",
+    input.brevity ? `Style:\n${input.brevity}` : "",
+    fullContext,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export async function POST(req: Request) {
@@ -41,36 +121,11 @@ export async function POST(req: Request) {
     if (!node) return NextResponse.json({ error: "Node not found" }, { status: 404 });
 
     const incomingHops = Math.max(0, Number(process.env.WORK_INCOMING_HOPS ?? 3));
-    const memoryNodes: Array<{ id: string; context: string; createdAt: Date; depth: number }> = [];
-
-    if (incomingHops > 0) {
-      const visited = new Set<string>([node.id]);
-      let frontier = [node.id];
-
-      for (let depth = 1; depth <= incomingHops; depth += 1) {
-        const edges = await prisma.edge.findMany({
-          where: { canvasId: node.canvasId, targetNodeId: { in: frontier } },
-          select: { sourceNodeId: true },
-        });
-        const sourceIds = Array.from(
-          new Set(edges.map((e) => e.sourceNodeId).filter((id) => id && !visited.has(id)))
-        ) as string[];
-
-        if (sourceIds.length === 0) break;
-
-        const sources = await prisma.node.findMany({
-          where: { id: { in: sourceIds } },
-          select: { id: true, context: true, createdAt: true },
-        });
-
-        for (const s of sources) {
-          visited.add(s.id);
-          memoryNodes.push({ id: s.id, context: extractOutput(s.context), createdAt: s.createdAt, depth });
-        }
-
-        frontier = sourceIds;
-      }
-    }
+    const memoryNodes = await collectIncomingMemory({
+      nodeId: node.id,
+      canvasId: node.canvasId,
+      incomingHops,
+    });
 
     const instruction = instructionId
       ? await prisma.instruction.findUnique({ where: { id: instructionId } })
@@ -84,27 +139,13 @@ export async function POST(req: Request) {
     const brevity = (process.env.OPENAI_BREVITY_PROMPT ?? "Be concise. Prefer bullet points. ")
       .trim();
 
-    const orderedMemory = memoryNodes
-      .sort((a, b) => {
-        if (a.depth !== b.depth) return b.depth - a.depth; // farthest first
-        return a.createdAt.getTime() - b.createdAt.getTime();
-      })
-      .map((n) => n.context)
-      .filter((c) => c.trim().length > 0)
-      .join("\n\n---\n\n");
-
     const currentOutput = extractOutput(node.context);
-    const fullContext = orderedMemory
-      ? `Upstream Context:\n${orderedMemory}\n\nCurrent Context:\n${currentOutput}`
-      : `Current Context:\n${currentOutput}`;
-
-    const fullPrompt = [
-      instructionText ? `Instruction:\n${instructionText}` : "",
-      brevity ? `Style:\n${brevity}` : "",
-      fullContext,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const fullPrompt = buildExecutionPrompt({
+      instructionText,
+      brevity,
+      currentContext: currentOutput,
+      memoryNodes,
+    });
 
     const model = process.env.OPENAI_MODEL ?? "gpt-5";
     const maxOutputTokens = Number(process.env.OPENAI_MAX_OUTPUT_TOKENS ?? 1000);
@@ -125,6 +166,8 @@ export async function POST(req: Request) {
             let output = "";
             let responseId: string | null = null;
 
+            // Stream partial text to the client so the UI can show progress
+            // without persisting intermediate text into the graph.
             const events = await client.responses.create({
               model,
               input: fullPrompt,
