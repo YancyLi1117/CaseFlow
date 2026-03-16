@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { prisma } from "@/lib/db";
+import { extractOutput } from "@/lib/text";
 
 type Body = {
   nodeId: string;
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
 
         for (const s of sources) {
           visited.add(s.id);
-          memoryNodes.push({ id: s.id, context: s.context, createdAt: s.createdAt, depth });
+          memoryNodes.push({ id: s.id, context: extractOutput(s.context), createdAt: s.createdAt, depth });
         }
 
         frontier = sourceIds;
@@ -92,9 +93,10 @@ export async function POST(req: Request) {
       .filter((c) => c.trim().length > 0)
       .join("\n\n---\n\n");
 
+    const currentOutput = extractOutput(node.context);
     const fullContext = orderedMemory
-      ? `Upstream Context:\n${orderedMemory}\n\nCurrent Context:\n${node.context}`
-      : `Current Context:\n${node.context}`;
+      ? `Upstream Context:\n${orderedMemory}\n\nCurrent Context:\n${currentOutput}`
+      : `Current Context:\n${currentOutput}`;
 
     const fullPrompt = [
       instructionText ? `Instruction:\n${instructionText}` : "",
@@ -156,10 +158,7 @@ export async function POST(req: Request) {
               return;
             }
 
-            const nextContext =
-              node.context.trim().length > 0
-                ? `MEMORY:\n${node.context}\n\nOUTPUT:\n${output}`
-                : output;
+            const nextContext = output;
 
             const run = await prisma.nodeRun.create({
               data: {
@@ -247,10 +246,7 @@ export async function POST(req: Request) {
         { status: 502 }
       );
     }
-    const nextContext =
-      node.context.trim().length > 0
-        ? `MEMORY:\n${node.context}\n\nOUTPUT:\n${output}`
-        : output;
+    const nextContext = output;
 
     const run = await prisma.nodeRun.create({
       data: {
