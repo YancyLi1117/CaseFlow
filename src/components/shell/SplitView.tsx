@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Paper, Stack, Box, Button } from "@mui/material";
+import React, { useEffect, useRef } from "react";
+import { Paper, Stack, Box, Button, useMediaQuery, useTheme } from "@mui/material";
 import { ModeTabs, type AppMode } from "./ModeTabs";
 import { TopBar } from "./TopBar";
 
@@ -26,42 +26,73 @@ export function Shell(props: {
   right: React.ReactNode;
   rightCollapsed: boolean;
   onToggleRight: () => void;
+  onAutoCollapse: () => void;
 }) {
-  const rightWidth = props.rightCollapsed ? "28px" : "360px";
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isCompact = useMediaQuery(theme.breakpoints.down("lg"));
+  const wasCompactRef = useRef(isCompact);
+
+  useEffect(() => {
+    if (isCompact && !wasCompactRef.current && !props.rightCollapsed) {
+      props.onAutoCollapse();
+    }
+    wasCompactRef.current = isCompact;
+  }, [isCompact, props.onAutoCollapse, props.rightCollapsed]);
+
+  const rightWidth = props.rightCollapsed ? "36px" : isCompact ? "320px" : "360px";
+  const mobileInspectorHeight = props.rightCollapsed ? "44px" : "42vh";
+  const toolbar = (
+    <Paper
+      elevation={2}
+      sx={{
+        position: isMobile ? "relative" : "absolute",
+        zIndex: 10,
+        left: isMobile ? "auto" : 12,
+        top: isMobile ? "auto" : 12,
+        m: isMobile ? 1 : 0,
+        p: 1,
+        borderRadius: 2,
+        maxWidth: isMobile ? "calc(100vw - 16px)" : "min(960px, calc(100vw - 420px))",
+      }}
+    >
+      <Stack direction={isMobile ? "column" : "row"} spacing={isMobile ? 1 : 2} alignItems={isMobile ? "stretch" : "center"}>
+        <ModeTabs mode={props.mode} onChange={props.onModeChange} />
+        <TopBar {...props.topbar} />
+      </Stack>
+    </Paper>
+  );
+
+  const collapsedButton = (
+    <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", p: 0.5 }}>
+      <Button size="small" variant="outlined" onClick={props.onToggleRight}>
+        {isMobile ? "Inspector" : "<"}
+      </Button>
+    </Box>
+  );
+
+  if (isMobile) {
+    return (
+      <Box sx={{ height: "100vh", display: "grid", gridTemplateRows: `auto minmax(0, 1fr) ${mobileInspectorHeight}` }}>
+        {toolbar}
+        <Box sx={{ minHeight: 0, overflow: "hidden" }}>{props.left}</Box>
+        <Box sx={{ borderTop: "1px solid", borderColor: "divider", minHeight: 0, overflow: "hidden" }}>
+          {props.rightCollapsed ? collapsedButton : props.right}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ height: "100vh", display: "grid", gridTemplateColumns: `1fr ${rightWidth}` }}>
       <Box sx={{ position: "relative", minHeight: 0 }}>
-        <Paper
-          elevation={2}
-          sx={{
-            position: "absolute",
-            zIndex: 10,
-            left: 12,
-            top: 12,
-            p: 1,
-            borderRadius: 2,
-          }}
-        >
-          <Stack direction="row" spacing={2} alignItems="center">
-            <ModeTabs mode={props.mode} onChange={props.onModeChange} />
-            <TopBar {...props.topbar} />
-          </Stack>
-        </Paper>
+        {toolbar}
 
         <Box sx={{ height: "100%", minHeight: 0 }}>{props.left}</Box>
       </Box>
 
       <Box sx={{ borderLeft: "1px solid", borderColor: "divider", height: "100%", overflow: "hidden" }}>
-        {props.rightCollapsed ? (
-          <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Button size="small" variant="outlined" onClick={props.onToggleRight}>
-              {"<"}
-            </Button>
-          </Box>
-        ) : (
-          props.right
-        )}
+        {props.rightCollapsed ? collapsedButton : props.right}
       </Box>
     </Box>
   );

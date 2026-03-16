@@ -1042,6 +1042,7 @@ function PageInner() {
       onModeChange={setMode}
       rightCollapsed={inspectorCollapsed}
       onToggleRight={() => setInspectorCollapsed((prev) => !prev)}
+      onAutoCollapse={() => setInspectorCollapsed(true)}
       topbar={{
         onNewNode,
         onCombineToInstruction,

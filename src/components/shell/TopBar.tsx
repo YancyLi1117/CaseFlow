@@ -17,7 +17,7 @@ export function TopBar(props: {
   canDelete: boolean;
 }) {
   return (
-    <Stack direction="row" spacing={1} alignItems="center">
+    <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
       <Button size="small" variant="contained" onClick={props.onNewNode} disabled={!props.canNew}>
         New Node
       </Button>
@@ -41,7 +41,7 @@ export function TopBar(props: {
         value={props.apiKey}
         onChange={(e) => props.onApiKeyChange(e.target.value)}
         placeholder="sk-..."
-        sx={{ width: 240 }}
+        sx={{ width: { xs: "100%", sm: 260 } }}
       />
     </Stack>
   );

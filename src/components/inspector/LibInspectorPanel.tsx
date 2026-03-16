@@ -42,7 +42,17 @@ export function LibInspectorPanel(props: {
   onCollapse: () => void;
 }) {
   return (
-    <Paper elevation={0} sx={{ borderLeft: "1px solid", borderColor: "divider", p: 2, height: "100%", overflow: "auto" }}>
+    <Paper
+      elevation={0}
+      sx={{
+        borderLeft: { xs: "none", md: "1px solid" },
+        borderTop: { xs: "1px solid", md: "none" },
+        borderColor: "divider",
+        p: 2,
+        height: "100%",
+        overflow: "auto",
+      }}
+    >
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
         <Typography variant="h6">Inspector</Typography>
         <Button size="small" variant="outlined" onClick={props.onCollapse}>

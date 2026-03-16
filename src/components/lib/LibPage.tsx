@@ -47,10 +47,10 @@ export function LibPage(props: {
         height: "100%",
         minHeight: 0,
         display: "grid",
-        gridTemplateRows: "30% 70%",
+        gridTemplateRows: { xs: "38% 62%", md: "30% 70%" },
         gap: 1,
         p: 1,
-        pt: 9,
+        pt: { xs: 1, md: 9 },
       }}
     >
       <Paper variant="outlined" sx={{ overflow: "auto", minHeight: 0 }}>
@@ -94,7 +94,7 @@ export function LibPage(props: {
           ) : null}
         </Stack>
         
-        <Box sx={{ minHeight: 320, height: "100%", overflow: "hidden" }}>
+        <Box sx={{ minHeight: { xs: 220, md: 320 }, height: "100%", overflow: "hidden" }}>
           {!props.selectedInstruction ? (
             <Box sx={{ p: 2 }}>
               <Typography variant="body2" color="text.secondary">
